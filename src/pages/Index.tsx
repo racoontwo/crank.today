@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimelineScrollbar } from "@/components/TimelineScrollbar";
 
 interface Todo {
   id: string;
@@ -169,6 +170,15 @@ const Index = () => {
     }, 600);
   };
 
+  const navigateToDay = (index: number) => {
+    if (index === currentDayIndex || isAnimating) return;
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentDayIndex(index);
+      setIsAnimating(false);
+    }, 600);
+  };
+
   const currentNote = dailyNotes[currentDayIndex];
   const isToday = currentDayIndex === 0;
 
@@ -179,7 +189,9 @@ const Index = () => {
       ref={containerRef}
     >
       <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-full max-w-2xl px-8 transform-style-3d">
+        <div className="w-full max-w-2xl px-8 transform-style-3d flex items-center gap-12">
+          {/* Main content area */}
+          <div className="flex-1">
           {/* Date display */}
           <div 
             className="text-center mb-12 transition-all duration-700"
@@ -263,28 +275,41 @@ const Index = () => {
               </div>
             )}
           </div>
+          </div>
 
-          {/* Back to Today button */}
-          {!isToday && (
-            <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in">
-              <Button
-                onClick={goToToday}
-                variant="outline"
-                className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
-              >
-                Back to Today
-              </Button>
-            </div>
-          )}
-
-          {/* Navigation hint */}
+          {/* Timeline Scrollbar */}
           {dailyNotes.length > 1 && (
-            <div className="fixed bottom-12 right-12 text-xs font-light opacity-30 tracking-wide">
-              Scroll to travel through time
+            <div className="hidden md:block">
+              <TimelineScrollbar
+                totalDays={dailyNotes.length}
+                currentIndex={currentDayIndex}
+                onNavigate={navigateToDay}
+                isAnimating={isAnimating}
+              />
             </div>
           )}
         </div>
       </div>
+
+      {/* Back to Today button */}
+      {!isToday && (
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in">
+          <Button
+            onClick={goToToday}
+            variant="outline"
+            className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
+          >
+            Back to Today
+          </Button>
+        </div>
+      )}
+
+      {/* Navigation hint */}
+      {dailyNotes.length > 1 && (
+        <div className="fixed bottom-12 right-12 text-xs font-light opacity-30 tracking-wide">
+          Scroll to travel through time
+        </div>
+      )}
 
       <style>{`
         @keyframes fade-in {
