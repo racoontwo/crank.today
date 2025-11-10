@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
+import { Trash2 } from "lucide-react";
 
 interface Todo {
   id: string;
@@ -136,6 +137,19 @@ const Index = () => {
     });
   };
 
+  const handleDeleteTodo = (todoId: string) => {
+    if (currentDayIndex !== 0) return; // Only allow deleting on today
+
+    setDailyNotes(prev => {
+      const updated = [...prev];
+      updated[currentDayIndex] = {
+        ...updated[currentDayIndex],
+        todos: updated[currentDayIndex].todos.filter(todo => todo.id !== todoId)
+      };
+      return updated;
+    });
+  };
+
   const handleScroll = (e: React.WheelEvent) => {
     if (isAnimating) return;
 
@@ -263,6 +277,15 @@ const Index = () => {
                   >
                     {todo.text}
                   </label>
+                  {isToday && (
+                    <button
+                      onClick={() => handleDeleteTodo(todo.id)}
+                      className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+                      aria-label="Delete task"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
