@@ -193,6 +193,35 @@ const Index = () => {
     }, 600);
   };
 
+  const handleCopyUnfinishedTodos = () => {
+    if (currentDayIndex === 0 || isAnimating) return;
+    
+    const unfinishedTodos = currentNote.todos.filter(todo => !todo.completed);
+    
+    if (unfinishedTodos.length > 0) {
+      setDailyNotes(prev => {
+        const updated = [...prev];
+        const newTodos = unfinishedTodos.map(todo => ({
+          ...todo,
+          id: Date.now().toString() + Math.random(), // Generate new ID
+          completed: false
+        }));
+        updated[0] = {
+          ...updated[0],
+          todos: [...updated[0].todos, ...newTodos]
+        };
+        return updated;
+      });
+    }
+    
+    // Navigate back to today
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentDayIndex(0);
+      setIsAnimating(false);
+    }, 600);
+  };
+
   const currentNote = dailyNotes[currentDayIndex];
   const isToday = currentDayIndex === 0;
 
@@ -316,13 +345,20 @@ const Index = () => {
 
       {/* Back to Today button */}
       {!isToday && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in">
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in flex gap-3">
           <Button
             onClick={goToToday}
             variant="outline"
             className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
           >
             Back to Today
+          </Button>
+          <Button
+            onClick={handleCopyUnfinishedTodos}
+            variant="outline"
+            className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
+          >
+            Copy Unfinished
           </Button>
         </div>
       )}
