@@ -154,9 +154,10 @@ const Index = () => {
   const handleCopyTodo = (todoId: string, todoText: string) => {
     navigator.clipboard.writeText(todoText);
     setCopiedTodoId(todoId);
-    setTimeout(() => {
-      setCopiedTodoId(null);
-    }, 2000);
+  };
+
+  const handleTodoMouseLeave = () => {
+    setCopiedTodoId(null);
   };
 
   const handleScroll = (e: React.WheelEvent) => {
@@ -297,6 +298,7 @@ const Index = () => {
                   style={{
                     animation: `fade-in 0.4s ease-out ${index * 0.1}s both`
                   }}
+                  onMouseLeave={handleTodoMouseLeave}
                 >
                   <Checkbox
                     id={todo.id}
