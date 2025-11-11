@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
 import { Trash2, Copy, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Toaster } from "@/components/ui/toaster";
 
 interface Todo {
   id: string;
@@ -55,7 +53,6 @@ const Index = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
   // Load data from localStorage
   useEffect(() => {
@@ -157,10 +154,6 @@ const Index = () => {
   const handleCopyTodo = (todoId: string, todoText: string) => {
     navigator.clipboard.writeText(todoText);
     setCopiedTodoId(todoId);
-    toast({
-      description: "Copied",
-      duration: 1500,
-    });
     setTimeout(() => {
       setCopiedTodoId(null);
     }, 2000);
@@ -322,17 +315,24 @@ const Index = () => {
                   >
                     {todo.text}
                   </label>
-                  <button
-                    onClick={() => handleCopyTodo(todo.id, todo.text)}
-                    className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
-                    aria-label="Copy task"
-                  >
-                    {copiedTodoId === todo.id ? (
-                      <Check className="w-4 h-4 animate-scale-in" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
+                  <div className="relative">
+                    <button
+                      onClick={() => handleCopyTodo(todo.id, todo.text)}
+                      className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+                      aria-label="Copy task"
+                    >
+                      {copiedTodoId === todo.id ? (
+                        <Check className="w-4 h-4 animate-scale-in" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                    {copiedTodoId === todo.id && (
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground/80 text-background px-2 py-1 rounded text-xs whitespace-nowrap animate-fade-in">
+                        Copied
+                      </div>
                     )}
-                  </button>
+                  </div>
                   {isToday && (
                     <button
                       onClick={() => handleDeleteTodo(todo.id)}
@@ -409,7 +409,6 @@ const Index = () => {
           }
         }
       `}</style>
-      <Toaster />
     </div>
   );
 };
