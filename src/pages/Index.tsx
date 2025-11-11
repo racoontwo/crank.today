@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy } from "lucide-react";
+import { Trash2, Copy, Check } from "lucide-react";
 
 interface Todo {
   id: string;
@@ -51,6 +51,7 @@ const Index = () => {
   const [inputValue, setInputValue] = useState("");
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Load data from localStorage
@@ -150,8 +151,12 @@ const Index = () => {
     });
   };
 
-  const handleCopyTodo = (todoText: string) => {
+  const handleCopyTodo = (todoId: string, todoText: string) => {
     navigator.clipboard.writeText(todoText);
+    setCopiedTodoId(todoId);
+    setTimeout(() => {
+      setCopiedTodoId(null);
+    }, 2000);
   };
 
   const handleScroll = (e: React.WheelEvent) => {
@@ -311,11 +316,15 @@ const Index = () => {
                     {todo.text}
                   </label>
                   <button
-                    onClick={() => handleCopyTodo(todo.text)}
+                    onClick={() => handleCopyTodo(todo.id, todo.text)}
                     className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
                     aria-label="Copy task"
                   >
-                    <Copy className="w-4 h-4" />
+                    {copiedTodoId === todo.id ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
                   </button>
                   {isToday && (
                     <button
