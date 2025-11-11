@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
 import { Trash2, Copy, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 interface Todo {
   id: string;
@@ -53,6 +55,7 @@ const Index = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   // Load data from localStorage
   useEffect(() => {
@@ -154,6 +157,10 @@ const Index = () => {
   const handleCopyTodo = (todoId: string, todoText: string) => {
     navigator.clipboard.writeText(todoText);
     setCopiedTodoId(todoId);
+    toast({
+      description: "Copied",
+      duration: 1500,
+    });
     setTimeout(() => {
       setCopiedTodoId(null);
     }, 2000);
@@ -402,6 +409,7 @@ const Index = () => {
           }
         }
       `}</style>
+      <Toaster />
     </div>
   );
 };
