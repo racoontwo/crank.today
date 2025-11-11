@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
+import { Trash2 } from "lucide-react";
 
 interface Todo {
   id: string;
@@ -136,6 +137,19 @@ const Index = () => {
     });
   };
 
+  const handleDeleteTodo = (todoId: string) => {
+    if (currentDayIndex !== 0) return; // Only allow deleting on today
+
+    setDailyNotes(prev => {
+      const updated = [...prev];
+      updated[currentDayIndex] = {
+        ...updated[currentDayIndex],
+        todos: updated[currentDayIndex].todos.filter(todo => todo.id !== todoId)
+      };
+      return updated;
+    });
+  };
+
   const handleScroll = (e: React.WheelEvent) => {
     if (isAnimating) return;
 
@@ -175,6 +189,35 @@ const Index = () => {
     setIsAnimating(true);
     setTimeout(() => {
       setCurrentDayIndex(index);
+      setIsAnimating(false);
+    }, 600);
+  };
+
+  const handleCopyUnfinishedTodos = () => {
+    if (currentDayIndex === 0 || isAnimating) return;
+    
+    const unfinishedTodos = currentNote.todos.filter(todo => !todo.completed);
+    
+    if (unfinishedTodos.length > 0) {
+      setDailyNotes(prev => {
+        const updated = [...prev];
+        const newTodos = unfinishedTodos.map(todo => ({
+          ...todo,
+          id: Date.now().toString() + Math.random(), // Generate new ID
+          completed: false
+        }));
+        updated[0] = {
+          ...updated[0],
+          todos: [...updated[0].todos, ...newTodos]
+        };
+        return updated;
+      });
+    }
+    
+    // Navigate back to today
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentDayIndex(0);
       setIsAnimating(false);
     }, 600);
   };
@@ -263,6 +306,15 @@ const Index = () => {
                   >
                     {todo.text}
                   </label>
+                  {isToday && (
+                    <button
+                      onClick={() => handleDeleteTodo(todo.id)}
+                      className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+                      aria-label="Delete task"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -293,13 +345,20 @@ const Index = () => {
 
       {/* Back to Today button */}
       {!isToday && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in">
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 animate-fade-in flex gap-3">
           <Button
             onClick={goToToday}
             variant="outline"
             className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
           >
             Back to Today
+          </Button>
+          <Button
+            onClick={handleCopyUnfinishedTodos}
+            variant="outline"
+            className="border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-300 rounded-full px-8 py-2 text-xs font-light tracking-widest uppercase"
+          >
+            Copy Unfinished
           </Button>
         </div>
       )}
