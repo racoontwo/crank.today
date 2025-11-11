@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2 } from "lucide-react";
+import { Trash2, Copy } from "lucide-react";
 
 interface Todo {
   id: string;
@@ -148,6 +148,10 @@ const Index = () => {
       };
       return updated;
     });
+  };
+
+  const handleCopyTodo = (todoText: string) => {
+    navigator.clipboard.writeText(todoText);
   };
 
   const handleScroll = (e: React.WheelEvent) => {
@@ -306,6 +310,13 @@ const Index = () => {
                   >
                     {todo.text}
                   </label>
+                  <button
+                    onClick={() => handleCopyTodo(todo.text)}
+                    className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+                    aria-label="Copy task"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
                   {isToday && (
                     <button
                       onClick={() => handleDeleteTodo(todo.id)}
