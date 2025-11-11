@@ -321,7 +321,7 @@ const Index = () => {
                     aria-label="Copy task"
                   >
                     {copiedTodoId === todo.id ? (
-                      <Check className="w-4 h-4 text-green-500" />
+                      <Check className="w-4 h-4 animate-scale-in" />
                     ) : (
                       <Copy className="w-4 h-4" />
                     )}
