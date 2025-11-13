@@ -3,7 +3,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Todo {
   id: string;
@@ -15,6 +30,106 @@ interface DailyNote {
   date: string;
   todos: Todo[];
 }
+
+interface SortableTodoItemProps {
+  todo: Todo;
+  index: number;
+  isToday: boolean;
+  copiedTodoId: string | null;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onCopy: (id: string, text: string) => void;
+  onMouseLeave: () => void;
+}
+
+const SortableTodoItem = ({
+  todo,
+  index,
+  isToday,
+  copiedTodoId,
+  onToggle,
+  onDelete,
+  onCopy,
+  onMouseLeave,
+}: SortableTodoItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: todo.id, disabled: !isToday });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-4 py-3 border-b border-border/30 group transition-all duration-300 hover:border-border"
+      onMouseLeave={onMouseLeave}
+    >
+      {isToday && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+      )}
+      <Checkbox
+        id={todo.id}
+        checked={todo.completed}
+        onCheckedChange={() => onToggle(todo.id)}
+        disabled={!isToday}
+        className="border-foreground/30 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+      />
+      <label
+        htmlFor={todo.id}
+        className={`flex-1 text-base font-light cursor-pointer transition-all duration-300 ${
+          todo.completed
+            ? "line-through opacity-40"
+            : "opacity-80 group-hover:opacity-100"
+        }`}
+      >
+        {todo.text}
+      </label>
+      <div className="relative">
+        <button
+          onClick={() => onCopy(todo.id, todo.text)}
+          className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+          aria-label="Copy task"
+        >
+          {copiedTodoId === todo.id ? (
+            <Check className="w-4 h-4 animate-scale-in" />
+          ) : (
+            <Copy className="w-4 h-4" />
+          )}
+        </button>
+        {copiedTodoId === todo.id && (
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground/80 text-background px-2 py-1 rounded text-xs whitespace-nowrap animate-fade-in">
+            Copied
+          </div>
+        )}
+      </div>
+      {isToday && (
+        <button
+          onClick={() => onDelete(todo.id)}
+          className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+          aria-label="Delete task"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
@@ -53,6 +168,14 @@ const Index = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   // Load data from localStorage
   useEffect(() => {
@@ -158,6 +281,25 @@ const Index = () => {
 
   const handleTodoMouseLeave = () => {
     setCopiedTodoId(null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    setDailyNotes((prev) => {
+      const updated = [...prev];
+      const todos = updated[currentDayIndex].todos;
+      const oldIndex = todos.findIndex((todo) => todo.id === active.id);
+      const newIndex = todos.findIndex((todo) => todo.id === over.id);
+
+      updated[currentDayIndex] = {
+        ...updated[currentDayIndex],
+        todos: arrayMove(todos, oldIndex, newIndex),
+      };
+      return updated;
+    });
   };
 
   const handleScroll = (e: React.WheelEvent) => {
@@ -290,63 +432,32 @@ const Index = () => {
             )}
 
             {/* Todo list */}
-            <div className="space-y-1">
-              {currentNote?.todos.map((todo, index) => (
-                <div
-                  key={todo.id}
-                  className="flex items-center gap-4 py-3 border-b border-border/30 group transition-all duration-300 hover:border-border"
-                  style={{
-                    animation: `fade-in 0.4s ease-out ${index * 0.1}s both`
-                  }}
-                  onMouseLeave={handleTodoMouseLeave}
-                >
-                  <Checkbox
-                    id={todo.id}
-                    checked={todo.completed}
-                    onCheckedChange={() => handleToggleTodo(todo.id)}
-                    disabled={!isToday}
-                    className="border-foreground/30 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
-                  />
-                  <label
-                    htmlFor={todo.id}
-                    className={`flex-1 text-base font-light cursor-pointer transition-all duration-300 ${
-                      todo.completed 
-                        ? 'line-through opacity-40' 
-                        : 'opacity-80 group-hover:opacity-100'
-                    }`}
-                  >
-                    {todo.text}
-                  </label>
-                  <div className="relative">
-                    <button
-                      onClick={() => handleCopyTodo(todo.id, todo.text)}
-                      className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
-                      aria-label="Copy task"
-                    >
-                      {copiedTodoId === todo.id ? (
-                        <Check className="w-4 h-4 animate-scale-in" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                    {copiedTodoId === todo.id && (
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground/80 text-background px-2 py-1 rounded text-xs whitespace-nowrap animate-fade-in">
-                        Copied
-                      </div>
-                    )}
-                  </div>
-                  {isToday && (
-                    <button
-                      onClick={() => handleDeleteTodo(todo.id)}
-                      className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
-                      aria-label="Delete task"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={currentNote?.todos.map((todo) => todo.id) || []}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1">
+                  {currentNote?.todos.map((todo, index) => (
+                    <SortableTodoItem
+                      key={todo.id}
+                      todo={todo}
+                      index={index}
+                      isToday={isToday}
+                      copiedTodoId={copiedTodoId}
+                      onToggle={handleToggleTodo}
+                      onDelete={handleDeleteTodo}
+                      onCopy={handleCopyTodo}
+                      onMouseLeave={handleTodoMouseLeave}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
 
             {currentNote?.todos.length === 0 && (
               <div className="text-center py-16 opacity-30">
