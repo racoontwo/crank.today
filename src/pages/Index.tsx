@@ -36,10 +36,16 @@ interface SortableTodoItemProps {
   index: number;
   isToday: boolean;
   copiedTodoId: string | null;
+  editingTodoId: string | null;
+  editingText: string;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onCopy: (id: string, text: string) => void;
   onMouseLeave: () => void;
+  onStartEdit: (id: string, text: string) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onEditingTextChange: (text: string) => void;
 }
 
 const SortableTodoItem = ({
@@ -47,10 +53,16 @@ const SortableTodoItem = ({
   index,
   isToday,
   copiedTodoId,
+  editingTodoId,
+  editingText,
   onToggle,
   onDelete,
   onCopy,
   onMouseLeave,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditingTextChange,
 }: SortableTodoItemProps) => {
   const {
     attributes,
@@ -90,16 +102,35 @@ const SortableTodoItem = ({
         disabled={!isToday}
         className="border-foreground/30 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
       />
-      <label
-        htmlFor={todo.id}
-        className={`flex-1 text-base font-light cursor-pointer transition-all duration-300 ${
-          todo.completed
-            ? "line-through opacity-40"
-            : "opacity-80 group-hover:opacity-100"
-        }`}
-      >
-        {todo.text}
-      </label>
+      {editingTodoId === todo.id ? (
+        <Input
+          value={editingText}
+          onChange={(e) => onEditingTextChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onSaveEdit();
+            } else if (e.key === 'Escape') {
+              onCancelEdit();
+            }
+          }}
+          onBlur={onSaveEdit}
+          autoFocus
+          className="flex-1 text-base font-light border-0 border-b border-border bg-transparent focus-visible:ring-0 focus-visible:border-foreground transition-colors py-0 h-auto rounded-none px-0"
+        />
+      ) : (
+        <div
+          onClick={() => isToday && onStartEdit(todo.id, todo.text)}
+          className={`flex-1 text-base font-light transition-all duration-300 ${
+            isToday ? "cursor-text" : "cursor-default"
+          } ${
+            todo.completed
+              ? "line-through opacity-40"
+              : "opacity-80 group-hover:opacity-100"
+          }`}
+        >
+          {todo.text}
+        </div>
+      )}
       <div className="relative">
         <button
           onClick={() => onCopy(todo.id, todo.text)}
@@ -167,6 +198,8 @@ const Index = () => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -281,6 +314,38 @@ const Index = () => {
 
   const handleTodoMouseLeave = () => {
     setCopiedTodoId(null);
+  };
+
+  const handleStartEdit = (todoId: string, currentText: string) => {
+    if (currentDayIndex !== 0) return; // Only allow editing on today
+    setEditingTodoId(todoId);
+    setEditingText(currentText);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingTodoId || !editingText.trim()) {
+      setEditingTodoId(null);
+      return;
+    }
+
+    setDailyNotes(prev => {
+      const updated = [...prev];
+      updated[currentDayIndex] = {
+        ...updated[currentDayIndex],
+        todos: updated[currentDayIndex].todos.map(todo =>
+          todo.id === editingTodoId ? { ...todo, text: editingText.trim() } : todo
+        )
+      };
+      return updated;
+    });
+
+    setEditingTodoId(null);
+    setEditingText("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTodoId(null);
+    setEditingText("");
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -449,10 +514,16 @@ const Index = () => {
                       index={index}
                       isToday={isToday}
                       copiedTodoId={copiedTodoId}
+                      editingTodoId={editingTodoId}
+                      editingText={editingText}
                       onToggle={handleToggleTodo}
                       onDelete={handleDeleteTodo}
                       onCopy={handleCopyTodo}
                       onMouseLeave={handleTodoMouseLeave}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingTextChange={setEditingText}
                     />
                   ))}
                 </div>
