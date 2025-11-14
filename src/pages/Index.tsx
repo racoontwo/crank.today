@@ -3,7 +3,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check, GripVertical } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical, Mic } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   DndContext,
   closestCenter,
@@ -192,6 +193,7 @@ const getDateDisplay = (dateString: string): string => {
 };
 
 const Index = () => {
+  const { toast } = useToast();
   const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
   const [inputValue, setInputValue] = useState("");
@@ -200,7 +202,9 @@ const Index = () => {
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -353,18 +357,74 @@ const Index = () => {
 
     if (!over || active.id === over.id) return;
 
-    setDailyNotes((prev) => {
-      const updated = [...prev];
-      const todos = updated[currentDayIndex].todos;
-      const oldIndex = todos.findIndex((todo) => todo.id === active.id);
-      const newIndex = todos.findIndex((todo) => todo.id === over.id);
+    const currentDayTodos = dailyNotes[currentDayIndex].todos;
+    const oldIndex = currentDayTodos.findIndex(todo => todo.id === active.id);
+    const newIndex = currentDayTodos.findIndex(todo => todo.id === over.id);
 
-      updated[currentDayIndex] = {
-        ...updated[currentDayIndex],
-        todos: arrayMove(todos, oldIndex, newIndex),
-      };
-      return updated;
-    });
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newTodos = arrayMove(currentDayTodos, oldIndex, newIndex);
+      
+      setDailyNotes(prev => {
+        const updated = [...prev];
+        updated[currentDayIndex] = {
+          ...updated[currentDayIndex],
+          todos: newTodos
+        };
+        return updated;
+      });
+    }
+  };
+
+  const startVoiceRecording = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Not supported",
+        description: "Voice recognition is not supported in your browser",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue(transcript);
+      setIsRecording(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      toast({
+        title: "Error",
+        description: "Failed to recognize speech. Please try again.",
+        variant: "destructive",
+      });
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
   };
 
   const handleScroll = (e: React.WheelEvent) => {
@@ -480,7 +540,7 @@ const Index = () => {
           >
             {/* Input box */}
             {isToday && (
-              <div className="mb-8 animate-fade-in">
+              <div className="mb-8 animate-fade-in relative">
                 <Input
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
@@ -490,9 +550,20 @@ const Index = () => {
                     }
                   }}
                   placeholder="What needs to be done?"
-                  className="w-full text-center border-0 border-b border-border bg-transparent focus-visible:ring-0 focus-visible:border-foreground transition-colors text-base font-light py-4 rounded-none"
+                  className="w-full text-center border-0 border-b border-border bg-transparent focus-visible:ring-0 focus-visible:border-foreground transition-colors text-base font-light py-4 pr-12 rounded-none"
                   disabled={!isToday}
                 />
+                <button
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-200 ${
+                    isRecording 
+                      ? 'bg-red-500/20 text-red-500 animate-pulse' 
+                      : 'opacity-40 hover:opacity-100 hover:bg-accent'
+                  }`}
+                  aria-label={isRecording ? "Stop recording" : "Start voice recording"}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
               </div>
             )}
 
