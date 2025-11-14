@@ -3,8 +3,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check, GripVertical, Mic } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical, Mic, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DndContext,
   closestCenter,
@@ -30,6 +38,13 @@ interface Todo {
 interface DailyNote {
   date: string;
   todos: Todo[];
+}
+
+interface CompletedTodo {
+  id: string;
+  text: string;
+  completedAt: string;
+  completedDate: string;
 }
 
 interface SortableTodoItemProps {
@@ -203,6 +218,8 @@ const Index = () => {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [completedHistory, setCompletedHistory] = useState<CompletedTodo[]>([]);
+  const [showCompletedDialog, setShowCompletedDialog] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -217,6 +234,12 @@ const Index = () => {
   // Load data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('timeMachineTodos');
+    const storedCompleted = localStorage.getItem('completedTodosHistory');
+    
+    if (storedCompleted) {
+      setCompletedHistory(JSON.parse(storedCompleted));
+    }
+    
     if (stored) {
       const parsed = JSON.parse(stored);
       setDailyNotes(parsed);
@@ -288,6 +311,24 @@ const Index = () => {
 
     setDailyNotes(prev => {
       const updated = [...prev];
+      const todo = updated[currentDayIndex].todos.find(t => t.id === todoId);
+      
+      if (todo && !todo.completed) {
+        // Save to completed history
+        const completedTodo: CompletedTodo = {
+          id: todoId,
+          text: todo.text,
+          completedAt: new Date().toISOString(),
+          completedDate: currentDate,
+        };
+        
+        setCompletedHistory(prevHistory => {
+          const newHistory = [completedTodo, ...prevHistory];
+          localStorage.setItem('completedTodosHistory', JSON.stringify(newHistory));
+          return newHistory;
+        });
+      }
+      
       updated[currentDayIndex] = {
         ...updated[currentDayIndex],
         todos: updated[currentDayIndex].todos.map(todo =>
@@ -651,6 +692,56 @@ const Index = () => {
           Scroll to travel through time
         </div>
       )}
+
+      {/* Completed Tasks Button */}
+      <Dialog open={showCompletedDialog} onOpenChange={setShowCompletedDialog}>
+        <DialogTrigger asChild>
+          <button
+            className="fixed bottom-12 left-12 p-3 rounded-full opacity-20 hover:opacity-100 transition-all duration-300 hover:bg-accent"
+            aria-label="View completed tasks"
+          >
+            <Trophy className="w-4 h-4" />
+          </button>
+        </DialogTrigger>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-light">Your Achievements</DialogTitle>
+            <DialogDescription className="font-light">
+              All the tasks you've completed
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-4">
+            {completedHistory.length === 0 ? (
+              <div className="text-center py-16 opacity-30">
+                <p className="text-sm font-light">No completed tasks yet. Keep going!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {completedHistory.map((task) => (
+                  <div
+                    key={task.id}
+                    className="border-b border-border/30 pb-4 last:border-0"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Check className="w-4 h-4 mt-1 text-foreground/60 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-base font-light">{task.text}</p>
+                        <p className="text-xs opacity-40 mt-1 font-light">
+                          Completed on {task.completedDate} at{" "}
+                          {new Date(task.completedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <style>{`
         @keyframes fade-in {
