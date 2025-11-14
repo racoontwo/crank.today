@@ -550,7 +550,7 @@ const Index = () => {
                     }
                   }}
                   placeholder="What needs to be done?"
-                  className="w-full text-center border-0 border-b border-border bg-transparent focus-visible:ring-0 focus-visible:border-foreground transition-colors text-base font-light py-4 pr-12 rounded-none"
+                  className="w-full text-center border-0 border-b border-border bg-transparent focus-visible:ring-0 focus-visible:border-foreground transition-colors text-base font-light py-4 px-12 rounded-none"
                   disabled={!isToday}
                 />
                 <button
