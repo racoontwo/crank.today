@@ -3,7 +3,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check, GripVertical, Mic, Trophy } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -209,6 +210,7 @@ const getDateDisplay = (dateString: string): string => {
 
 const Index = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
   const [inputValue, setInputValue] = useState("");
@@ -693,16 +695,18 @@ const Index = () => {
         </div>
       )}
 
-      {/* Completed Tasks Button */}
-      <Dialog open={showCompletedDialog} onOpenChange={setShowCompletedDialog}>
-        <DialogTrigger asChild>
-          <button
-            className="fixed bottom-12 left-12 p-3 rounded-full opacity-20 hover:opacity-100 transition-all duration-300 hover:bg-accent"
-            aria-label="View completed tasks"
-          >
-            <Trophy className="w-4 h-4" />
-          </button>
-        </DialogTrigger>
+      {/* Bottom left buttons */}
+      <div className="fixed bottom-12 left-12 flex items-center gap-3">
+        {/* Completed Tasks Button */}
+        <Dialog open={showCompletedDialog} onOpenChange={setShowCompletedDialog}>
+          <DialogTrigger asChild>
+            <button
+              className="p-3 rounded-full opacity-20 hover:opacity-100 transition-all duration-300 hover:bg-accent"
+              aria-label="View completed tasks"
+            >
+              <Trophy className="w-4 h-4" />
+            </button>
+          </DialogTrigger>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl font-light">Your Achievements</DialogTitle>
@@ -742,6 +746,16 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Coffee/Donate Button */}
+      <button
+        onClick={() => navigate("/donate")}
+        className="p-3 rounded-full opacity-20 hover:opacity-100 transition-all duration-300 hover:bg-accent"
+        aria-label="Buy me a coffee"
+      >
+        <Coffee className="w-4 h-4" />
+      </button>
+    </div>
 
       <style>{`
         @keyframes fade-in {
