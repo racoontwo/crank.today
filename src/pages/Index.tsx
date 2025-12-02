@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToastAction } from "@/components/ui/toast";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
 import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee, Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -589,14 +590,30 @@ const Index = () => {
     e.stopPropagation();
     if (tabs.length <= 1) return;
     
-    const tabIndex = tabs.findIndex(t => t.id === tabId);
-    const newTabs = tabs.filter(t => t.id !== tabId);
-    setTabs(newTabs);
+    const tabToClose = tabs.find(t => t.id === tabId);
+    const totalTodos = tabToClose?.dailyNotes.reduce((sum, note) => sum + note.todos.length, 0) || 0;
     
-    if (activeTabId === tabId) {
-      const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
-      setActiveTabId(newTabs[newActiveIndex].id);
-    }
+    toast({
+      title: "Close this list?",
+      description: `This list contains ${totalTodos} task${totalTodos !== 1 ? 's' : ''} across ${tabToClose?.dailyNotes.length || 0} day${(tabToClose?.dailyNotes.length || 0) !== 1 ? 's' : ''}. This cannot be undone.`,
+      action: (
+        <ToastAction
+          altText="Close list"
+          onClick={() => {
+            const tabIndex = tabs.findIndex(t => t.id === tabId);
+            const newTabs = tabs.filter(t => t.id !== tabId);
+            setTabs(newTabs);
+            
+            if (activeTabId === tabId) {
+              const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
+              setActiveTabId(newTabs[newActiveIndex].id);
+            }
+          }}
+        >
+          Close
+        </ToastAction>
+      ),
+    });
   };
 
   const handleTabNameDoubleClick = (tabId: string, currentName: string) => {
