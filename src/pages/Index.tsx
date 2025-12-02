@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee, Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -46,6 +46,13 @@ interface CompletedTodo {
   text: string;
   completedAt: string;
   completedDate: string;
+}
+
+interface Tab {
+  id: string;
+  name: string;
+  dailyNotes: DailyNote[];
+  currentDayIndex: number;
 }
 
 interface SortableTodoItemProps {
@@ -208,13 +215,23 @@ const getDateDisplay = (dateString: string): string => {
   }
 };
 
+const createNewTab = (name: string = "New List"): Tab => {
+  const currentDate = formatDate(new Date());
+  return {
+    id: Date.now().toString(),
+    name,
+    dailyNotes: [{ date: currentDate, todos: [] }],
+    currentDayIndex: 0,
+  };
+};
+
 const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>("");
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
   const [inputValue, setInputValue] = useState("");
-  const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [copiedTodoId, setCopiedTodoId] = useState<string | null>(null);
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
@@ -222,6 +239,8 @@ const Index = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [completedHistory, setCompletedHistory] = useState<CompletedTodo[]>([]);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabName, setEditingTabName] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -233,40 +252,64 @@ const Index = () => {
     })
   );
 
+  // Get the active tab
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const dailyNotes = activeTab?.dailyNotes || [];
+  const currentDayIndex = activeTab?.currentDayIndex || 0;
+
   // Load data from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('timeMachineTodos');
+    const storedTabs = localStorage.getItem('timeMachineTabsData');
     const storedCompleted = localStorage.getItem('completedTodosHistory');
     
     if (storedCompleted) {
       setCompletedHistory(JSON.parse(storedCompleted));
     }
     
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setDailyNotes(parsed);
-      
-      const todayIndex = parsed.findIndex((note: DailyNote) => note.date === currentDate);
-      if (todayIndex !== -1) {
-        setCurrentDayIndex(todayIndex);
-      } else {
-        const newNote: DailyNote = { date: currentDate, todos: [] };
-        setDailyNotes([newNote, ...parsed]);
-        setCurrentDayIndex(0);
-      }
+    if (storedTabs) {
+      const parsed = JSON.parse(storedTabs);
+      // Ensure today's note exists for all tabs
+      const updatedTabs = parsed.tabs.map((tab: Tab) => {
+        const todayIndex = tab.dailyNotes.findIndex((note: DailyNote) => note.date === currentDate);
+        if (todayIndex === -1) {
+          return {
+            ...tab,
+            dailyNotes: [{ date: currentDate, todos: [] }, ...tab.dailyNotes],
+            currentDayIndex: 0,
+          };
+        }
+        return tab;
+      });
+      setTabs(updatedTabs);
+      setActiveTabId(parsed.activeTabId || updatedTabs[0]?.id);
     } else {
-      const newNote: DailyNote = { date: currentDate, todos: [] };
-      setDailyNotes([newNote]);
-      setCurrentDayIndex(0);
+      // Migrate old data or create new
+      const oldStored = localStorage.getItem('timeMachineTodos');
+      if (oldStored) {
+        const oldNotes = JSON.parse(oldStored);
+        const todayIndex = oldNotes.findIndex((note: DailyNote) => note.date === currentDate);
+        const migratedTab: Tab = {
+          id: 'default',
+          name: 'Main',
+          dailyNotes: todayIndex === -1 ? [{ date: currentDate, todos: [] }, ...oldNotes] : oldNotes,
+          currentDayIndex: todayIndex === -1 ? 0 : todayIndex,
+        };
+        setTabs([migratedTab]);
+        setActiveTabId('default');
+      } else {
+        const newTab = createNewTab("Main");
+        setTabs([newTab]);
+        setActiveTabId(newTab.id);
+      }
     }
   }, []);
 
-  // Save to localStorage whenever dailyNotes changes
+  // Save to localStorage whenever tabs change
   useEffect(() => {
-    if (dailyNotes.length > 0) {
-      localStorage.setItem('timeMachineTodos', JSON.stringify(dailyNotes));
+    if (tabs.length > 0 && activeTabId) {
+      localStorage.setItem('timeMachineTabsData', JSON.stringify({ tabs, activeTabId }));
     }
-  }, [dailyNotes]);
+  }, [tabs, activeTabId]);
 
   // Check for day change
   useEffect(() => {
@@ -274,18 +317,26 @@ const Index = () => {
       const newDate = formatDate(new Date());
       if (newDate !== currentDate) {
         setCurrentDate(newDate);
-        const newNote: DailyNote = { date: newDate, todos: [] };
-        setDailyNotes(prev => [newNote, ...prev]);
+        setTabs(prev => prev.map(tab => ({
+          ...tab,
+          dailyNotes: [{ date: newDate, todos: [] }, ...tab.dailyNotes],
+          currentDayIndex: 0,
+        })));
         setIsAnimating(true);
         setTimeout(() => {
-          setCurrentDayIndex(0);
           setIsAnimating(false);
         }, 800);
       }
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [currentDate]);
+
+  const updateActiveTab = (updater: (tab: Tab) => Tab) => {
+    setTabs(prev => prev.map(tab => 
+      tab.id === activeTabId ? updater(tab) : tab
+    ));
+  };
 
   const handleAddTodo = () => {
     if (!inputValue.trim() || currentDayIndex !== 0) return;
@@ -296,62 +347,58 @@ const Index = () => {
       completed: false
     };
 
-    setDailyNotes(prev => {
-      const updated = [...prev];
-      updated[0] = {
-        ...updated[0],
-        todos: [...updated[0].todos, newTodo]
-      };
-      return updated;
-    });
+    updateActiveTab(tab => ({
+      ...tab,
+      dailyNotes: tab.dailyNotes.map((note, idx) => 
+        idx === 0 ? { ...note, todos: [...note.todos, newTodo] } : note
+      ),
+    }));
 
     setInputValue("");
   };
 
   const handleToggleTodo = (todoId: string) => {
-    if (currentDayIndex !== 0) return; // Only allow toggling on today
+    if (currentDayIndex !== 0) return;
 
-    setDailyNotes(prev => {
-      const updated = [...prev];
-      const todo = updated[currentDayIndex].todos.find(t => t.id === todoId);
-      
-      if (todo && !todo.completed) {
-        // Save to completed history
-        const completedTodo: CompletedTodo = {
-          id: todoId,
-          text: todo.text,
-          completedAt: new Date().toISOString(),
-          completedDate: currentDate,
-        };
-        
-        setCompletedHistory(prevHistory => {
-          const newHistory = [completedTodo, ...prevHistory];
-          localStorage.setItem('completedTodosHistory', JSON.stringify(newHistory));
-          return newHistory;
-        });
-      }
-      
-      updated[currentDayIndex] = {
-        ...updated[currentDayIndex],
-        todos: updated[currentDayIndex].todos.map(todo =>
-          todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
-        )
+    const currentNote = dailyNotes[currentDayIndex];
+    const todo = currentNote?.todos.find(t => t.id === todoId);
+    
+    if (todo && !todo.completed) {
+      const completedTodo: CompletedTodo = {
+        id: todoId,
+        text: todo.text,
+        completedAt: new Date().toISOString(),
+        completedDate: currentDate,
       };
-      return updated;
-    });
+      
+      setCompletedHistory(prevHistory => {
+        const newHistory = [completedTodo, ...prevHistory];
+        localStorage.setItem('completedTodosHistory', JSON.stringify(newHistory));
+        return newHistory;
+      });
+    }
+
+    updateActiveTab(tab => ({
+      ...tab,
+      dailyNotes: tab.dailyNotes.map((note, idx) => 
+        idx === currentDayIndex 
+          ? { ...note, todos: note.todos.map(t => t.id === todoId ? { ...t, completed: !t.completed } : t) }
+          : note
+      ),
+    }));
   };
 
   const handleDeleteTodo = (todoId: string) => {
-    if (currentDayIndex !== 0) return; // Only allow deleting on today
+    if (currentDayIndex !== 0) return;
 
-    setDailyNotes(prev => {
-      const updated = [...prev];
-      updated[currentDayIndex] = {
-        ...updated[currentDayIndex],
-        todos: updated[currentDayIndex].todos.filter(todo => todo.id !== todoId)
-      };
-      return updated;
-    });
+    updateActiveTab(tab => ({
+      ...tab,
+      dailyNotes: tab.dailyNotes.map((note, idx) => 
+        idx === currentDayIndex 
+          ? { ...note, todos: note.todos.filter(t => t.id !== todoId) }
+          : note
+      ),
+    }));
   };
 
   const handleCopyTodo = (todoId: string, todoText: string) => {
@@ -364,7 +411,7 @@ const Index = () => {
   };
 
   const handleStartEdit = (todoId: string, currentText: string) => {
-    if (currentDayIndex !== 0) return; // Only allow editing on today
+    if (currentDayIndex !== 0) return;
     setEditingTodoId(todoId);
     setEditingText(currentText);
   };
@@ -375,16 +422,14 @@ const Index = () => {
       return;
     }
 
-    setDailyNotes(prev => {
-      const updated = [...prev];
-      updated[currentDayIndex] = {
-        ...updated[currentDayIndex],
-        todos: updated[currentDayIndex].todos.map(todo =>
-          todo.id === editingTodoId ? { ...todo, text: editingText.trim() } : todo
-        )
-      };
-      return updated;
-    });
+    updateActiveTab(tab => ({
+      ...tab,
+      dailyNotes: tab.dailyNotes.map((note, idx) => 
+        idx === currentDayIndex 
+          ? { ...note, todos: note.todos.map(t => t.id === editingTodoId ? { ...t, text: editingText.trim() } : t) }
+          : note
+      ),
+    }));
 
     setEditingTodoId(null);
     setEditingText("");
@@ -400,21 +445,19 @@ const Index = () => {
 
     if (!over || active.id === over.id) return;
 
-    const currentDayTodos = dailyNotes[currentDayIndex].todos;
+    const currentDayTodos = dailyNotes[currentDayIndex]?.todos || [];
     const oldIndex = currentDayTodos.findIndex(todo => todo.id === active.id);
     const newIndex = currentDayTodos.findIndex(todo => todo.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
       const newTodos = arrayMove(currentDayTodos, oldIndex, newIndex);
       
-      setDailyNotes(prev => {
-        const updated = [...prev];
-        updated[currentDayIndex] = {
-          ...updated[currentDayIndex],
-          todos: newTodos
-        };
-        return updated;
-      });
+      updateActiveTab(tab => ({
+        ...tab,
+        dailyNotes: tab.dailyNotes.map((note, idx) => 
+          idx === currentDayIndex ? { ...note, todos: newTodos } : note
+        ),
+      }));
     }
   };
 
@@ -478,17 +521,15 @@ const Index = () => {
 
     if (Math.abs(delta) > threshold) {
       if (delta > 0 && currentDayIndex < dailyNotes.length - 1) {
-        // Scroll down - go to previous day
         setIsAnimating(true);
         setTimeout(() => {
-          setCurrentDayIndex(prev => prev + 1);
+          updateActiveTab(tab => ({ ...tab, currentDayIndex: tab.currentDayIndex + 1 }));
           setIsAnimating(false);
         }, 400);
       } else if (delta < 0 && currentDayIndex > 0) {
-        // Scroll up - go to next day (forward in time)
         setIsAnimating(true);
         setTimeout(() => {
-          setCurrentDayIndex(prev => prev - 1);
+          updateActiveTab(tab => ({ ...tab, currentDayIndex: tab.currentDayIndex - 1 }));
           setIsAnimating(false);
         }, 400);
       }
@@ -499,7 +540,7 @@ const Index = () => {
     if (currentDayIndex === 0 || isAnimating) return;
     setIsAnimating(true);
     setTimeout(() => {
-      setCurrentDayIndex(0);
+      updateActiveTab(tab => ({ ...tab, currentDayIndex: 0 }));
       setIsAnimating(false);
     }, 600);
   };
@@ -508,7 +549,7 @@ const Index = () => {
     if (index === currentDayIndex || isAnimating) return;
     setIsAnimating(true);
     setTimeout(() => {
-      setCurrentDayIndex(index);
+      updateActiveTab(tab => ({ ...tab, currentDayIndex: index }));
       setIsAnimating(false);
     }, 600);
   };
@@ -516,30 +557,61 @@ const Index = () => {
   const handleCopyUnfinishedTodos = () => {
     if (currentDayIndex === 0 || isAnimating) return;
     
-    const unfinishedTodos = currentNote.todos.filter(todo => !todo.completed);
+    const currentNote = dailyNotes[currentDayIndex];
+    const unfinishedTodos = currentNote?.todos.filter(todo => !todo.completed) || [];
     
     if (unfinishedTodos.length > 0) {
-      setDailyNotes(prev => {
-        const updated = [...prev];
-        const newTodos = unfinishedTodos.map(todo => ({
-          ...todo,
-          id: Date.now().toString() + Math.random(), // Generate new ID
-          completed: false
-        }));
-        updated[0] = {
-          ...updated[0],
-          todos: [...updated[0].todos, ...newTodos]
-        };
-        return updated;
-      });
+      updateActiveTab(tab => ({
+        ...tab,
+        dailyNotes: tab.dailyNotes.map((note, idx) => 
+          idx === 0 
+            ? { ...note, todos: [...note.todos, ...unfinishedTodos.map(t => ({ ...t, id: Date.now().toString() + Math.random(), completed: false }))] }
+            : note
+        ),
+      }));
     }
     
-    // Navigate back to today
     setIsAnimating(true);
     setTimeout(() => {
-      setCurrentDayIndex(0);
+      updateActiveTab(tab => ({ ...tab, currentDayIndex: 0 }));
       setIsAnimating(false);
     }, 600);
+  };
+
+  // Tab management
+  const handleAddTab = () => {
+    const newTab = createNewTab(`List ${tabs.length + 1}`);
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+  };
+
+  const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (tabs.length <= 1) return;
+    
+    const tabIndex = tabs.findIndex(t => t.id === tabId);
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    
+    if (activeTabId === tabId) {
+      const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
+      setActiveTabId(newTabs[newActiveIndex].id);
+    }
+  };
+
+  const handleTabNameDoubleClick = (tabId: string, currentName: string) => {
+    setEditingTabId(tabId);
+    setEditingTabName(currentName);
+  };
+
+  const handleTabNameSave = () => {
+    if (editingTabId && editingTabName.trim()) {
+      setTabs(prev => prev.map(tab => 
+        tab.id === editingTabId ? { ...tab, name: editingTabName.trim() } : tab
+      ));
+    }
+    setEditingTabId(null);
+    setEditingTabName("");
   };
 
   const currentNote = dailyNotes[currentDayIndex];
@@ -551,7 +623,81 @@ const Index = () => {
       onWheel={handleScroll}
       ref={containerRef}
     >
-      <div className="fixed inset-0 flex items-center justify-center">
+      {/* Tab bar - only show when multiple tabs */}
+      {tabs.length > 1 && (
+        <div className="fixed top-0 left-0 right-0 flex items-center border-b border-border/20 bg-background/80 backdrop-blur-sm z-50">
+          <div className="flex items-center flex-1 overflow-x-auto">
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTabId(tab.id)}
+                className={`group relative flex items-center gap-2 px-4 py-3 cursor-pointer border-r border-border/20 transition-all duration-200 min-w-[120px] max-w-[200px] ${
+                  tab.id === activeTabId 
+                    ? 'bg-background' 
+                    : 'bg-muted/30 hover:bg-muted/50'
+                }`}
+              >
+                {editingTabId === tab.id ? (
+                  <Input
+                    value={editingTabName}
+                    onChange={(e) => setEditingTabName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleTabNameSave();
+                      if (e.key === 'Escape') {
+                        setEditingTabId(null);
+                        setEditingTabName("");
+                      }
+                    }}
+                    onBlur={handleTabNameSave}
+                    autoFocus
+                    className="h-5 text-xs font-light border-0 bg-transparent focus-visible:ring-0 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span 
+                    className="text-xs font-light truncate flex-1"
+                    onDoubleClick={() => handleTabNameDoubleClick(tab.id, tab.name)}
+                  >
+                    {tab.name}
+                  </span>
+                )}
+                {tabs.length > 1 && (
+                  <button
+                    onClick={(e) => handleCloseTab(tab.id, e)}
+                    className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity duration-200"
+                    aria-label="Close tab"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                {tab.id === activeTabId && (
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground/20" />
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={handleAddTab}
+            className="p-3 opacity-40 hover:opacity-100 transition-opacity duration-200"
+            aria-label="Add new tab"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Single tab: just show + button in top right */}
+      {tabs.length === 1 && (
+        <button
+          onClick={handleAddTab}
+          className="fixed top-4 right-4 p-2 opacity-20 hover:opacity-100 transition-opacity duration-200 z-50"
+          aria-label="Add new tab"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      )}
+
+      <div className={`fixed inset-0 flex items-center justify-center ${tabs.length > 1 ? 'pt-12' : ''}`}>
         <div className="w-full max-w-2xl px-8 transform-style-3d flex items-center gap-12">
           {/* Main content area */}
           <div className="flex-1">
