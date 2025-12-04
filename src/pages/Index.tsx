@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToastAction } from "@/components/ui/toast";
 import { TimelineScrollbar } from "@/components/TimelineScrollbar";
-import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee, Plus, X } from "lucide-react";
+import { Trash2, Copy, Check, GripVertical, Mic, Trophy, Coffee, Plus, X, Pin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,6 +35,7 @@ interface Todo {
   id: string;
   text: string;
   completed: boolean;
+  pinned?: boolean;
 }
 
 interface DailyNote {
@@ -71,6 +72,7 @@ interface SortableTodoItemProps {
   onSaveEdit: () => void;
   onCancelEdit: () => void;
   onEditingTextChange: (text: string) => void;
+  onTogglePin: (id: string) => void;
 }
 
 const SortableTodoItem = ({
@@ -88,6 +90,7 @@ const SortableTodoItem = ({
   onSaveEdit,
   onCancelEdit,
   onEditingTextChange,
+  onTogglePin,
 }: SortableTodoItemProps) => {
   const {
     attributes,
@@ -174,6 +177,19 @@ const SortableTodoItem = ({
           </div>
         )}
       </div>
+      {isToday && (
+        <button
+          onClick={() => onTogglePin(todo.id)}
+          className={`transition-opacity duration-200 ${
+            todo.pinned 
+              ? 'opacity-100 text-foreground' 
+              : 'opacity-0 group-hover:opacity-40 hover:!opacity-100'
+          }`}
+          aria-label={todo.pinned ? "Unpin task" : "Pin task"}
+        >
+          <Pin className={`w-4 h-4 ${todo.pinned ? 'fill-current' : ''}`} />
+        </button>
+      )}
       {isToday && (
         <button
           onClick={() => onDelete(todo.id)}
@@ -318,11 +334,18 @@ const Index = () => {
       const newDate = formatDate(new Date());
       if (newDate !== currentDate) {
         setCurrentDate(newDate);
-        setTabs(prev => prev.map(tab => ({
-          ...tab,
-          dailyNotes: [{ date: newDate, todos: [] }, ...tab.dailyNotes],
-          currentDayIndex: 0,
-        })));
+        setTabs(prev => prev.map(tab => {
+          // Get pinned todos from today (which will become yesterday)
+          const pinnedTodos = tab.dailyNotes[0]?.todos
+            .filter(todo => todo.pinned && !todo.completed)
+            .map(todo => ({ ...todo, id: Date.now().toString() + Math.random() })) || [];
+          
+          return {
+            ...tab,
+            dailyNotes: [{ date: newDate, todos: pinnedTodos }, ...tab.dailyNotes],
+            currentDayIndex: 0,
+          };
+        }));
         setIsAnimating(true);
         setTimeout(() => {
           setIsAnimating(false);
@@ -439,6 +462,19 @@ const Index = () => {
   const handleCancelEdit = () => {
     setEditingTodoId(null);
     setEditingText("");
+  };
+
+  const handleTogglePin = (todoId: string) => {
+    if (currentDayIndex !== 0) return;
+
+    updateActiveTab(tab => ({
+      ...tab,
+      dailyNotes: tab.dailyNotes.map((note, idx) => 
+        idx === currentDayIndex 
+          ? { ...note, todos: note.todos.map(t => t.id === todoId ? { ...t, pinned: !t.pinned } : t) }
+          : note
+      ),
+    }));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -801,6 +837,7 @@ const Index = () => {
                       onSaveEdit={handleSaveEdit}
                       onCancelEdit={handleCancelEdit}
                       onEditingTextChange={setEditingText}
+                      onTogglePin={handleTogglePin}
                     />
                   ))}
                 </div>
