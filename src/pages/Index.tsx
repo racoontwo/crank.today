@@ -595,7 +595,7 @@ const Index = () => {
     if (currentDayIndex === 0 || isAnimating) return;
     
     const currentNote = dailyNotes[currentDayIndex];
-    const unfinishedTodos = currentNote?.todos.filter(todo => !todo.completed) || [];
+    const unfinishedTodos = currentNote?.todos.filter(todo => !todo.completed && !todo.pinned) || [];
     
     if (unfinishedTodos.length > 0) {
       updateActiveTab(tab => ({
